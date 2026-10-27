@@ -8,7 +8,6 @@ A .NET 10 demo that compares placing an order **without** a Saga versus **with**
 |----------|---------|
 | `WithoutSaga.sln` | Phase 1 — Order service drives Inventory and Payment directly. No compensation. |
 | `WithSaga.sln` | Phase 2 — Orchestrator runs create → reserve → charge → confirm, with compensating cancel/release. |
-| `SagaDemo.sln` | Legacy / outdated entry (points at old project names). Prefer the two solutions above. |
 
 ## Prerequisites
 

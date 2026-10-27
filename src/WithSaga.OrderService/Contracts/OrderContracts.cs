@@ -8,6 +8,7 @@ public class CreateOrderRequest
     [MaxLength(64)]
     public string ProductId { get; set; } = "";
 
+    [Range(1, 1000)]
     public int Quantity { get; set; }
 
     [Range(0.01, 1000000)]
