@@ -12,6 +12,7 @@ public class CreateOrderRequest
 
     /// <summary>Units to reserve.</summary>
     /// <example>1</example>
+    [Range(1, 1000)]
     public int Quantity { get; set; }
 
     /// <summary>Amount the Payment service will charge.</summary>

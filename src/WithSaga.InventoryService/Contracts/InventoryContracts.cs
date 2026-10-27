@@ -11,6 +11,7 @@ public class StockRequest
     [MaxLength(64)]
     public string ProductId { get; set; } = "";
 
+    [Range(1, 1000)]
     public int Quantity { get; set; }
 }
 

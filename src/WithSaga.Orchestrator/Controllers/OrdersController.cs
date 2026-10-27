@@ -34,9 +34,11 @@ public class OrdersController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(PlaceOrderResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(PlaceOrderResponse), StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<PlaceOrderResponse>> Place(CreateOrderRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<PlaceOrderResponse>> Place(CreateOrderRequest request)
     {
-        var result = await _orchestrator.PlaceAsync(request, cancellationToken);
+        // The saga is not tied to the HTTP request. If the caller disconnects, the saga still
+        // finishes its steps or its compensations. Each call is still bounded by the HttpClient timeout.
+        var result = await _orchestrator.PlaceAsync(request, CancellationToken.None);
         return StatusCode(result.StatusCode, result.Response);
     }
 }
