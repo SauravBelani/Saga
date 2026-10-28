@@ -57,6 +57,16 @@ public class OrderCommands
             return OrderCommandResult.Fail(StatusCodes.Status404NotFound, $"Order {orderId} was not found.");
         }
 
+        // An order only moves forward: Created -> Confirmed or Created -> Cancelled.
+        // Asking for the status it already has is a repeat and gets the same answer.
+        var allowed = order.Status == status || order.Status == OrderStatus.Created;
+        if (!allowed)
+        {
+            return OrderCommandResult.Fail(
+                StatusCodes.Status409Conflict,
+                $"Order {orderId} is {order.Status} and cannot become {status}.");
+        }
+
         order.Status = status;
         await _db.SaveChangesAsync(cancellationToken);
 

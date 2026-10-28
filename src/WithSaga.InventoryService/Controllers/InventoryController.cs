@@ -33,6 +33,7 @@ public class InventoryController : ControllerBase
     /// <summary>
     /// Returns reserved stock to available and deletes the reservation. Compensation after payment fails.
     /// </summary>
+    // Demo only: no authentication. In production, only the orchestrator should be able to call this.
     [HttpPost("release")]
     [ProducesResponseType(typeof(ApiMessage), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiMessage), StatusCodes.Status404NotFound)]

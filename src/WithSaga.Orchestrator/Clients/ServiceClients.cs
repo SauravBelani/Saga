@@ -13,10 +13,26 @@ public sealed class RemoteCall
 
     public int? OrderId { get; init; }
 
+    /// <summary>
+    /// True when the request may have reached the service but no answer came back (timeout, dropped connection).
+    /// The step might have been applied, so the caller must not treat this as a plain failure.
+    /// </summary>
+    public bool OutcomeUnknown { get; init; }
+
+    /// <summary>The request never reached the service, so nothing was applied.</summary>
     public static RemoteCall Unreachable(string detail) => new()
     {
         Succeeded = false,
         StatusCode = 0,
+        Detail = detail
+    };
+
+    /// <summary>The request may or may not have been applied.</summary>
+    public static RemoteCall Unknown(string detail) => new()
+    {
+        Succeeded = false,
+        StatusCode = 0,
+        OutcomeUnknown = true,
         Detail = detail
     };
 }
@@ -185,14 +201,23 @@ internal static class HttpCalls
             };
         }
         catch (HttpRequestException exception)
+            when (exception.HttpRequestError is HttpRequestError.ConnectionError or HttpRequestError.NameResolutionError)
         {
+            // The connection was never opened, so the request definitely did not run.
             return RemoteCall.Unreachable(
                 $"{serviceName} service is not reachable at {http.BaseAddress}. Start WithSaga.{serviceName}Service. {exception.Message}");
         }
+        catch (HttpRequestException exception)
+        {
+            // The connection broke after the request was sent. The service may have done the work.
+            return RemoteCall.Unknown(
+                $"{serviceName} service closed the connection at {http.BaseAddress} before answering. {exception.Message}");
+        }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            return RemoteCall.Unreachable(
-                $"{serviceName} service did not respond at {http.BaseAddress}. {exception.Message}");
+            // A timeout says nothing about whether the request ran.
+            return RemoteCall.Unknown(
+                $"{serviceName} service did not respond in time at {http.BaseAddress}. {exception.Message}");
         }
     }
 }

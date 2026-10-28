@@ -21,9 +21,9 @@ public class StockService
 
     public async Task<StockOperationResult> ReserveAsync(StockRequest request, CancellationToken cancellationToken)
     {
-        bool isfailed = _configuration.GetValue<bool>("Inventory:SimulateFailure");
+        var simulateFailure = _configuration.GetValue<bool>("Inventory:SimulateFailure");
 
-        if (isfailed)
+        if (simulateFailure)
         {
             return StockOperationResult.Fail(
                 StatusCodes.Status500InternalServerError,

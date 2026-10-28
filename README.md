@@ -105,7 +105,17 @@ Compensation (new calls, not DB rollbacks):
 - `Inventory:SimulateFailure` → `true` in `WithSaga.InventoryService/appsettings.json`
 - `Payment:SimulateFailure` → `true` in `WithSaga.PaymentService/appsettings.json`
 
-Saga state is stored in `WithSaga_Orchestrator` (`Running` / `Completed` / `Compensated`).
+Saga state is stored in `WithSaga_Orchestrator` (`Running` / `Completed` / `Compensated`). A saga stays `Running` when it cannot finish cleanly: a compensation failed, Confirm failed after payment, or a service timed out so the outcome is unknown.
+
+## Tests
+
+`tests/WithSaga.Orchestrator.Tests` runs the orchestrator against fake Order, Inventory and Payment services (a stub `HttpMessageHandler`) and an in-memory saga database. Nothing else needs to be running:
+
+```bash
+dotnet test WithSaga.sln
+```
+
+The tests cover the happy path, an inventory failure, a payment failure, a payment timeout (nothing is undone), a failed release, the Order Service being down, and the saga row failing to save.
 
 ## Project layout
 
@@ -119,6 +129,9 @@ src/
   WithSaga.OrderService/         # Create / confirm / cancel
   WithSaga.InventoryService/     # Reserve + release (compensation)
   WithSaga.PaymentService/       # Charge; optional simulated failure
+
+tests/
+  WithSaga.Orchestrator.Tests/   # Orchestrator unit tests with fake services
 ```
 
 ## Stack
