@@ -53,19 +53,25 @@ builder.Services.AddDbContext<OrchestratorDbContext>(options =>
     // GSS Encryption Mode=Disable is in the connection string. Without it, Npgsql on this Windows host waits on a GSS handshake the local Postgres server does not complete.
     options.UseNpgsql(builder.Configuration.GetConnectionString("OrchestratorDb")));
 
+// The default HttpClient timeout is 100 seconds. A shorter one keeps a hung service from holding the request for minutes.
+var callTimeout = TimeSpan.FromSeconds(builder.Configuration.GetValue("Services:TimeoutSeconds", 10));
+
 builder.Services.AddHttpClient<OrderClient>(client =>
 {
     client.BaseAddress = RequireBaseAddress(builder.Configuration["Services:OrderBaseUrl"], "Services:OrderBaseUrl");
+    client.Timeout = callTimeout;
 });
 
 builder.Services.AddHttpClient<InventoryClient>(client =>
 {
     client.BaseAddress = RequireBaseAddress(builder.Configuration["Services:InventoryBaseUrl"], "Services:InventoryBaseUrl");
+    client.Timeout = callTimeout;
 });
 
 builder.Services.AddHttpClient<PaymentClient>(client =>
 {
     client.BaseAddress = RequireBaseAddress(builder.Configuration["Services:PaymentBaseUrl"], "Services:PaymentBaseUrl");
+    client.Timeout = callTimeout;
 });
 
 builder.Services.AddScoped<SagaOrchestrator>();

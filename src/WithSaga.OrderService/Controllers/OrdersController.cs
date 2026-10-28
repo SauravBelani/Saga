@@ -29,15 +29,18 @@ public class OrdersController : ControllerBase
     [HttpPost("{id:int}/confirm")]
     [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiMessage), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiMessage), StatusCodes.Status409Conflict)]
     public Task<IActionResult> Confirm(int id, CancellationToken cancellationToken)
     {
         return Update(id, _orders.ConfirmAsync(id, cancellationToken));
     }
 
     /// <summary>Sets the order to Cancelled. Compensation after inventory or payment fails.</summary>
+    // Demo only: no authentication. In production, only the orchestrator should be able to call this.
     [HttpPost("{id:int}/cancel")]
     [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiMessage), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiMessage), StatusCodes.Status409Conflict)]
     public Task<IActionResult> Cancel(int id, CancellationToken cancellationToken)
     {
         return Update(id, _orders.CancelAsync(id, cancellationToken));

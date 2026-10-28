@@ -33,11 +33,14 @@ public class OrdersController : ControllerBase
     /// </remarks>
     [HttpPost]
     [ProducesResponseType(typeof(PlaceOrderResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(PlaceOrderResponse), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(PlaceOrderResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(PlaceOrderResponse), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<PlaceOrderResponse>> Place(CreateOrderRequest request)
     {
-        // The saga is not tied to the HTTP request. If the caller disconnects, the saga still
-        // finishes its steps or its compensations. Each call is still bounded by the HttpClient timeout.
+        // The saga is not tied to the HTTP request, so a caller that disconnects cannot stop it halfway.
+        // It does not survive this process crashing; that needs a step log and a recovery worker.
         var result = await _orchestrator.PlaceAsync(request, CancellationToken.None);
         return StatusCode(result.StatusCode, result.Response);
     }
