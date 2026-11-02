@@ -108,6 +108,7 @@ public class SagaOrchestrator
 
         if (!charged.Succeeded)
         {
+            // Undo in reverse order: inventory first, then the order.
             var released = await _inventory.ReleaseAsync(saga.OrderId, request.ProductId, request.Quantity, cancellationToken);
             if (!released.Succeeded)
             {

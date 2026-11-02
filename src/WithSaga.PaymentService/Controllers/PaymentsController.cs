@@ -18,12 +18,12 @@ public class PaymentsController : ControllerBase
 
     /// <summary>
     /// Charges the customer and commits the result in the Payment database.
-    /// With simulated failure on, the Failed row is saved and this action returns HTTP 500.
+    /// With simulated failure on, the Failed row is saved and this action returns HTTP 402 (declined).
+    /// A repeat for the same order returns the original result.
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(PaymentResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(PaymentResponse), StatusCodes.Status500InternalServerError)]
-    [ProducesResponseType(typeof(ApiMessage), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(PaymentResponse), StatusCodes.Status402PaymentRequired)]
     public async Task<IActionResult> Charge(ChargePaymentRequest request, CancellationToken cancellationToken)
     {
         var result = await _payments.ChargeAsync(request, cancellationToken);

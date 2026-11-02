@@ -2,9 +2,9 @@ namespace WithSaga.Orchestrator.Models;
 
 public enum SagaStatus
 {
-    Running,
-    Completed,
-    Compensated
+    Running,      // In progress, or it could not reach a clean end
+    Completed,    // Every step succeeded
+    Compensated   // A step failed and every compensation succeeded
 }
 
 /// <summary>

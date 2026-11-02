@@ -19,7 +19,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Payment Service (with Saga)",
         Version = "v1",
-        Description = "Owns the Payment database only. When simulated failure is on, a Failed payment row is committed and the call returns HTTP 500. The orchestrator then releases stock and cancels the order."
+        Description = "Owns the Payment database only. When simulated failure is on, a Failed payment row is committed and the call returns HTTP 402 (declined). The orchestrator then releases stock and cancels the order. A repeated charge for the same order returns the original result."
     });
 
     var xmlPath = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
@@ -35,7 +35,12 @@ builder.Services.AddDbContext<PaymentDbContext>(options =>
 
 builder.Services.AddScoped<PaymentProcessor>();
 
+// Unexpected errors return a ProblemDetails body instead of an empty 500.
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 await DatabaseInitializer.InitializeAsync(app.Services);
 

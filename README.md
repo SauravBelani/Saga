@@ -42,7 +42,7 @@ Demo catalog seeds product **`A`** (“Product A”) with **10** units available
 
 ## Run — Phase 1 (Without Saga)
 
-Start Inventory and Payment first, then Order:
+In Visual Studio 2022 17.11 or later, open `WithoutSaga.sln` and pick the shared **All services** launch profile. Or start Inventory and Payment first, then Order:
 
 ```bash
 dotnet run --project src/WithoutSaga.InventoryService
@@ -69,7 +69,7 @@ Flow (each step is a separate DB commit):
 
 ## Run — Phase 2 (With Saga)
 
-Start Order, Inventory, and Payment, then the Orchestrator:
+In Visual Studio 2022 17.11 or later, open `WithSaga.sln` and pick the shared **All services** launch profile. Or start Order, Inventory, and Payment, then the Orchestrator:
 
 ```bash
 dotnet run --project src/WithSaga.OrderService
@@ -97,15 +97,18 @@ Compensation (new calls, not DB rollbacks):
 
 | Failure | Compensation |
 |---------|----------------|
-| Inventory reserve fails | Cancel order. Payment is not called. |
-| Payment fails | Release stock, then cancel order. Failed payment row remains. |
+| Inventory rejects the reservation (409) | Cancel order. Payment is not called. |
+| Payment is declined (402) | Release stock, then cancel order. Failed payment row remains. |
+| A service times out or returns 5xx | Nothing is undone. The outcome is unknown, so the saga stays `Running`. |
 
 **Failure toggles** (restart the affected service after changing):
 
 - `Inventory:SimulateFailure` → `true` in `WithSaga.InventoryService/appsettings.json`
 - `Payment:SimulateFailure` → `true` in `WithSaga.PaymentService/appsettings.json`
 
-Saga state is stored in `WithSaga_Orchestrator` (`Running` / `Completed` / `Compensated`). A saga stays `Running` when it cannot finish cleanly: a compensation failed, Confirm failed after payment, or a service timed out so the outcome is unknown.
+Reserve, Charge, Release, Confirm and Cancel are safe to repeat: a second call for the same order returns the original result instead of failing.
+
+Saga state is stored in `WithSaga_Orchestrator` (`Running` / `Completed` / `Compensated`). A saga stays `Running` when it cannot finish cleanly: a compensation failed, Confirm failed after payment, or a service timed out or answered with a 5xx, so the outcome is unknown.
 
 ## Tests
 
@@ -115,7 +118,7 @@ Saga state is stored in `WithSaga_Orchestrator` (`Running` / `Completed` / `Comp
 dotnet test WithSaga.sln
 ```
 
-The tests cover the happy path, an inventory failure, a payment failure, a payment timeout (nothing is undone), a failed release, the Order Service being down, and the saga row failing to save.
+The nine tests cover the happy path, an inventory rejection, a payment decline (release runs before cancel), a payment timeout and 5xx answers from Payment and Inventory (nothing is undone), a failed release, the Order Service being down, and the saga row failing to save.
 
 ## Project layout
 

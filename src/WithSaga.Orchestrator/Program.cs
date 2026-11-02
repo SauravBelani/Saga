@@ -33,6 +33,7 @@ builder.Services.AddSwaggerGen(options =>
 
             If reserve fails, the orchestrator cancels the order. Payment is not called, and stock is not released.
             If payment fails, the orchestrator releases the stock and then cancels the order. The Failed payment row stays.
+            If a service times out or answers with a 5xx, the outcome is unknown: nothing is undone and the saga stays Running.
 
             To fail inventory, set Inventory:SimulateFailure to true in the Inventory service appsettings.
             To fail payment, set Payment:SimulateFailure to true in the Payment service appsettings.
@@ -76,7 +77,12 @@ builder.Services.AddHttpClient<PaymentClient>(client =>
 
 builder.Services.AddScoped<SagaOrchestrator>();
 
+// Unexpected errors return a ProblemDetails body instead of an empty 500.
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 await DatabaseInitializer.InitializeAsync(app.Services);
 
