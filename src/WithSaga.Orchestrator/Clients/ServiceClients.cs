@@ -14,8 +14,9 @@ public sealed class RemoteCall
     public int? OrderId { get; init; }
 
     /// <summary>
-    /// True when the request may have reached the service but no answer came back (timeout, dropped connection).
-    /// The step might have been applied, so the caller must not treat this as a plain failure.
+    /// True when the step might have been applied but no clear answer came back:
+    /// a timeout, a dropped connection, or a 5xx server error.
+    /// The caller must not treat this as a plain failure.
     /// </summary>
     public bool OutcomeUnknown { get; init; }
 
@@ -197,7 +198,9 @@ internal static class HttpCalls
                 Succeeded = response.IsSuccessStatusCode,
                 StatusCode = (int)response.StatusCode,
                 Detail = detail,
-                OrderId = ApiJson.ExtractOrderId(raw)
+                OrderId = ApiJson.ExtractOrderId(raw),
+                // A 4xx is a clear "no". A 5xx only says something broke; the work may still have been done.
+                OutcomeUnknown = (int)response.StatusCode >= StatusCodes.Status500InternalServerError
             };
         }
         catch (HttpRequestException exception)

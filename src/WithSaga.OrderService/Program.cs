@@ -35,7 +35,12 @@ builder.Services.AddDbContext<OrderDbContext>(options =>
 
 builder.Services.AddScoped<OrderCommands>();
 
+// Unexpected errors return a ProblemDetails body instead of an empty 500.
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 await DatabaseInitializer.InitializeAsync(app.Services);
 

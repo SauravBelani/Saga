@@ -35,7 +35,12 @@ builder.Services.AddDbContext<InventoryDbContext>(options =>
 
 builder.Services.AddScoped<StockService>();
 
+// Unexpected errors return a ProblemDetails body instead of an empty 500.
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 await DatabaseInitializer.InitializeAsync(app.Services);
 

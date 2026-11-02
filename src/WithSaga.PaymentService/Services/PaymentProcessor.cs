@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using WithSaga.PaymentService.Contracts;
 using WithSaga.PaymentService.Data;
 using WithSaga.PaymentService.Models;
@@ -21,14 +22,13 @@ public class PaymentProcessor
 
     public async Task<ChargeOutcome> ChargeAsync(ChargePaymentRequest request, CancellationToken cancellationToken)
     {
+        // A repeat for the same order gets the original answer instead of a second charge.
         var existing = await _db.Payments.AsNoTracking()
-            .AnyAsync(row => row.OrderId == request.OrderId, cancellationToken);
+            .FirstOrDefaultAsync(row => row.OrderId == request.OrderId, cancellationToken);
 
-        if (existing)
+        if (existing is not null)
         {
-            return ChargeOutcome.Fail(
-                StatusCodes.Status409Conflict,
-                $"Order {request.OrderId} already has a payment row.");
+            return Replay(existing);
         }
 
         var simulateFailure = _configuration.GetValue<bool>("Payment:SimulateFailure");
@@ -43,19 +43,35 @@ public class PaymentProcessor
         };
 
         _db.Payments.Add(payment);
-        await _db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // Another request for this order saved its payment first (unique index on OrderId). Answer with that result.
+            var original = await _db.Payments.AsNoTracking()
+                .SingleAsync(row => row.OrderId == request.OrderId, cancellationToken);
+            return Replay(original);
+        }
 
         if (simulateFailure)
         {
+            // A declined card is an expected business outcome, so it is a 4xx. A 5xx would mean "the server broke".
             return ChargeOutcome.FromPayment(
-                StatusCodes.Status500InternalServerError,
-                Map(payment, $"Simulated payment failure for order {payment.OrderId}. Payment {payment.Id} is saved as Failed in the Payment database."));
+                StatusCodes.Status402PaymentRequired,
+                Map(payment, $"Simulated payment decline for order {payment.OrderId}. Payment {payment.Id} is saved as Failed in the Payment database."));
         }
 
         return ChargeOutcome.FromPayment(
             StatusCodes.Status200OK,
             Map(payment, $"Charged {payment.Amount:0.00} for order {payment.OrderId}. Payment {payment.Id} is Completed and committed in the Payment database."));
     }
+
+    private static ChargeOutcome Replay(Payment payment) => ChargeOutcome.FromPayment(
+        payment.Status == PaymentStatus.Completed ? StatusCodes.Status200OK : StatusCodes.Status402PaymentRequired,
+        Map(payment, $"Order {payment.OrderId} was already processed. Payment {payment.Id} is {payment.Status}."));
 
     private static PaymentResponse Map(Payment payment, string message) => new()
     {

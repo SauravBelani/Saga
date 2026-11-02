@@ -7,11 +7,11 @@ namespace WithSaga.Orchestrator.Controllers;
 [ApiController]
 [Route("api/orders")]
 [Produces("application/json")]
-public class OrdersController : ControllerBase
+public class SagaOrchestratorController : ControllerBase
 {
     private readonly SagaOrchestrator _orchestrator;
 
-    public OrdersController(SagaOrchestrator orchestrator)
+    public SagaOrchestratorController(SagaOrchestrator orchestrator)
     {
         _orchestrator = orchestrator;
     }
@@ -40,7 +40,8 @@ public class OrdersController : ControllerBase
     public async Task<ActionResult<PlaceOrderResponse>> Place(CreateOrderRequest request)
     {
         // The saga is not tied to the HTTP request, so a caller that disconnects cannot stop it halfway.
-        // It does not survive this process crashing; that needs a step log and a recovery worker.
+        // It does not survive this process crashing, restarting or being redeployed; that needs a step log
+        // and a recovery worker.
         var result = await _orchestrator.PlaceAsync(request, CancellationToken.None);
         return StatusCode(result.StatusCode, result.Response);
     }

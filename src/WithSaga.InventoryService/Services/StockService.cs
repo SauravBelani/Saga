@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using WithSaga.InventoryService.Contracts;
 using WithSaga.InventoryService.Data;
 using WithSaga.InventoryService.Models;
@@ -25,9 +26,16 @@ public class StockService
 
         if (simulateFailure)
         {
+            // A business rejection, so a 4xx. A 5xx would tell the orchestrator "the outcome is unknown".
             return StockOperationResult.Fail(
-                StatusCodes.Status500InternalServerError,
+                StatusCodes.Status409Conflict,
                 $"Simulated inventory failure for order {request.OrderId}. Stock was not changed.");
+        }
+
+        // A repeat for the same order gets the same answer and does not take stock twice.
+        if (await _db.Reservations.AnyAsync(row => row.OrderId == request.OrderId, cancellationToken))
+        {
+            return AlreadyReserved(request.OrderId);
         }
 
         var productId = request.ProductId.Trim();
@@ -59,7 +67,18 @@ public class StockService
             ReservedAtUtc = DateTime.UtcNow
         });
 
-        await _db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // A parallel request for this order reserved first (unique index on OrderId).
+            // Leaving without a commit rolls back the stock update above.
+            return AlreadyReserved(request.OrderId);
+        }
+
         await transaction.CommitAsync(cancellationToken);
 
         var available = await ReadAvailableAsync(productId, cancellationToken);
@@ -74,7 +93,9 @@ public class StockService
         var reservation = await _db.Reservations.FirstOrDefaultAsync(row => row.OrderId == request.OrderId, cancellationToken);
         if (reservation is null)
         {
-            return StockOperationResult.Fail(StatusCodes.Status404NotFound, $"No reservation exists for order {request.OrderId}.");
+            // Already released (or never reserved). The goal, "no stock held for this order", is met,
+            // so a retried compensation succeeds instead of failing with 404.
+            return StockOperationResult.Ok($"No reservation is held for order {request.OrderId}. Nothing to release.");
         }
 
         var quantity = reservation.Quantity;
@@ -99,6 +120,9 @@ public class StockService
         return StockOperationResult.Ok(
             $"Released {quantity} unit(s) of product {reservation.ProductId} for order {request.OrderId}. Available is now {available}. Committed in the Inventory database.");
     }
+
+    private static StockOperationResult AlreadyReserved(int orderId) =>
+        StockOperationResult.Ok($"Order {orderId} already has a reservation. Stock was not changed.");
 
     private Task<int> ReadAvailableAsync(string productId, CancellationToken cancellationToken)
     {

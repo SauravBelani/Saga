@@ -1,0 +1,23 @@
+[
+  {
+    "Name": "All services",
+    "Projects": [
+      {
+        "Path": "src\\WithSaga.Orchestrator\\WithSaga.Orchestrator.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\WithSaga.OrderService\\WithSaga.OrderService.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\WithSaga.InventoryService\\WithSaga.InventoryService.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\WithSaga.PaymentService\\WithSaga.PaymentService.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

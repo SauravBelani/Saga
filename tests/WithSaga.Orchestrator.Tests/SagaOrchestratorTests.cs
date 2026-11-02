@@ -33,9 +33,9 @@ public class SagaOrchestratorTests
     }
 
     [Fact]
-    public async Task Inventory_fails_so_only_the_order_is_cancelled()
+    public async Task Inventory_rejects_the_reservation_so_only_the_order_is_cancelled()
     {
-        var services = new FakeServices { Reserve = Respond(HttpStatusCode.InternalServerError) };
+        var services = new FakeServices { Reserve = Respond(HttpStatusCode.Conflict) };
         using var db = NewDb();
 
         var result = await NewOrchestrator(db, services).PlaceAsync(Request, CancellationToken.None);
@@ -46,9 +46,9 @@ public class SagaOrchestratorTests
     }
 
     [Fact]
-    public async Task Payment_fails_so_stock_is_released_before_the_order_is_cancelled()
+    public async Task Payment_is_declined_so_stock_is_released_before_the_order_is_cancelled()
     {
-        var services = new FakeServices { Charge = Respond(HttpStatusCode.InternalServerError) };
+        var services = new FakeServices { Charge = Respond(HttpStatusCode.PaymentRequired) };
         using var db = NewDb();
 
         var result = await NewOrchestrator(db, services).PlaceAsync(Request, CancellationToken.None);
@@ -73,11 +73,38 @@ public class SagaOrchestratorTests
     }
 
     [Fact]
+    public async Task Payment_answers_with_a_server_error_so_nothing_is_undone()
+    {
+        // A 5xx says the Payment Service broke, not that the charge didn't happen.
+        var services = new FakeServices { Charge = Respond(HttpStatusCode.InternalServerError) };
+        using var db = NewDb();
+
+        var result = await NewOrchestrator(db, services).PlaceAsync(Request, CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+        Assert.Equal("Running", result.Response.Status);
+        Assert.Equal(["create", "reserve", "charge"], services.Calls);
+    }
+
+    [Fact]
+    public async Task Inventory_answers_with_a_server_error_so_nothing_is_undone()
+    {
+        var services = new FakeServices { Reserve = Respond(HttpStatusCode.BadGateway) };
+        using var db = NewDb();
+
+        var result = await NewOrchestrator(db, services).PlaceAsync(Request, CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+        Assert.Equal("Running", result.Response.Status);
+        Assert.Equal(["create", "reserve"], services.Calls);
+    }
+
+    [Fact]
     public async Task Release_fails_so_the_saga_stays_running()
     {
         var services = new FakeServices
         {
-            Charge = Respond(HttpStatusCode.InternalServerError),
+            Charge = Respond(HttpStatusCode.PaymentRequired),
             Release = Respond(HttpStatusCode.InternalServerError)
         };
         using var db = NewDb();
@@ -86,6 +113,7 @@ public class SagaOrchestratorTests
 
         Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
         Assert.Equal("Running", result.Response.Status);
+        Assert.Equal(["create", "reserve", "charge", "release"], services.Calls);
         Assert.Equal(SagaStatus.Running, db.Sagas.Single().Status);
     }
 
